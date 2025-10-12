@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iDataflow WebSocket 测试客户端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .status.connected {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status.disconnected {
+            background: #f44336;
+            color: white;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-connect {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-disconnect {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-register {
+            background: #2196f3;
+            color: white;
+        }
+
+        .btn-send {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-ping {
+            background: #9c27b0;
+            color: white;
+        }
+
+        .btn-clear {
+            background: #607d8b;
+            color: white;
+        }
+
+        .messages {
+            background: #f5f5f5;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .message {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 3px;
+            word-wrap: break-word;
+        }
+
+        .message.sent {
+            background: #e3f2fd;
+            border-left: 3px solid #2196f3;
+        }
+
+        .message.received {
+            background: #f1f8e9;
+            border-left: 3px solid #4caf50;
+        }
+
+        .message.error {
+            background: #ffebee;
+            border-left: 3px solid #f44336;
+        }
+
+        .message .timestamp {
+            color: #999;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .message .content {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 iDataflow WebSocket 测试客户端</h1>
+        <p class="subtitle">测试 WebSocket 连接和数据传输</p>
+
+        <div class="status disconnected" id="status">未连接</div>
+
+        <div class="control-group">
+            <label for="wsUrl">WebSocket 服务器地址</label>
+            <input type="text" id="wsUrl" value="ws://localhost:3001" placeholder="ws://localhost:3001">
+        </div>
+
+        <div class="button-group">
+            <button class="btn-connect" onclick="connect()">连接</button>
+            <button class="btn-disconnect" onclick="disconnect()">断开</button>
+        </div>
+
+        <div class="control-group">
+            <label for="companyId">公司 ID（用于注册）</label>
+            <input type="text" id="companyId" value="1" placeholder="输入公司 ID">
+        </div>
+
+        <button class="btn-register" onclick="register()" style="width: 100%; margin-bottom: 20px;">注册公司 ID</button>
+
+        <div class="control-group">
+            <label for="dataPayload">数据负载（JSON 格式）</label>
+            <textarea id="dataPayload" placeholder='{"temperature": 25.5, "humidity": 60}'>{
+  "temperature": 25.5,
+  "humidity": 60,
+  "timestamp": "2025-10-12T10:30:00Z"
+}</textarea>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-send" onclick="sendData()">发送数据</button>
+            <button class="btn-ping" onclick="sendPing()">发送 Ping</button>
+            <button class="btn-clear" onclick="clearMessages()">清空消息</button>
+        </div>
+
+        <div class="control-group">
+            <label>消息日志</label>
+            <div class="messages" id="messages"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+
+        function addMessage(text, type = 'received') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <div class="content">${text}</div>
+            `;
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.textContent = '已连接';
+                statusDiv.className = 'status connected';
+            } else {
+                statusDiv.textContent = '未连接';
+                statusDiv.className = 'status disconnected';
+            }
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addMessage('已经连接，无需重复连接', 'error');
+                return;
+            }
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    updateStatus(true);
+                    addMessage('✅ WebSocket 连接成功', 'received');
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        addMessage(`📩 收到消息: ${JSON.stringify(data, null, 2)}`, 'received');
+                    } catch (e) {
+                        addMessage(`📩 收到消息: ${event.data}`, 'received');
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    addMessage(`❌ WebSocket 错误: ${error.message || '连接失败'}`, 'error');
+                };
+
+                ws.onclose = () => {
+                    updateStatus(false);
+                    addMessage('❌ WebSocket 连接已关闭', 'error');
+                };
+
+            } catch (error) {
+                addMessage(`❌ 连接失败: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                updateStatus(false);
+                addMessage('🔌 手动断开连接', 'sent');
+            }
+        }
+
+        function register() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('❌ 请先连接 WebSocket', 'error');
+                return;
+            }
+
+            const companyId = document.getElementById('companyId').value;
+            const message = {
+                type: 'register',
+                companyId: companyId
+            };
+
+            ws.send(JSON.stringify(message));
+            addMessage(`📤 发送注册请求: companyId=${companyId}`, 'sent');
+        }
+
+        function sendData() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('❌ 请先连接 WebSocket', 'error');
+                return;
+            }
+
+            try {
+                const payload = JSON.parse(document.getElementById('dataPayload').value);
+                const message = {
+                    type: 'data',
+                    payload: payload
+                };
+
+                ws.send(JSON.stringify(message));
+                addMessage(`📤 发送数据: ${JSON.stringify(message, null, 2)}`, 'sent');
+            } catch (error) {
+                addMessage(`❌ JSON 格式错误: ${error.message}`, 'error');
+            }
+        }
+
+        function sendPing() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('❌ 请先连接 WebSocket', 'error');
+                return;
+            }
+
+            const message = { type: 'ping' };
+            ws.send(JSON.stringify(message));
+            addMessage('📤 发送 Ping', 'sent');
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+            addMessage('🧹 消息已清空', 'received');
+        }
+
+        // 页面加载完成后自动添加欢迎消息
+        window.onload = () => {
+            addMessage('👋 欢迎使用 iDataflow WebSocket 测试客户端', 'received');
+            addMessage('💡 点击"连接"按钮开始测试', 'received');
+        };
+    </script>
+</body>
+</html>
