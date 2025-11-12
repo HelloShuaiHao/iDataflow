@@ -41,6 +41,11 @@ services:
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_PERSONALIZATION_ENABLED=false
       - N8N_SECURE_COOKIE=false
+      # 预设管理员账号（首次启动时创建，生产环境请修改密码）
+      - N8N_OWNER_EMAIL=admin@idataflow.local
+      - N8N_OWNER_PASSWORD=ChangeMe123!
+      - N8N_OWNER_FIRST_NAME=Admin
+      - N8N_OWNER_LAST_NAME=User
     ports:
       - "5678:5678"
     volumes:
