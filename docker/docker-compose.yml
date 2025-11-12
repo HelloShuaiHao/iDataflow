@@ -54,27 +54,58 @@ services:
       timeout: 10s
       retries: 3
 
-  # 后端服务（管理后台 API）
+  # C# 后端服务（管理后台 API）
   backend:
+    build:
+      context: ../backend-csharp
+      dockerfile: Dockerfile
+    container_name: idataflow-backend-csharp
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - PORT=3000
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=idataflow;Username=postgres;Password=postgres_password
+      - N8N__BaseUrl=http://n8n:5678
+      - N8N__ApiKey=
+      - JWT__SecretKey=your-secret-key-change-in-production-make-it-at-least-32-characters-long
+      - JWT__Issuer=iDataflow
+      - JWT__Audience=iDataflow-users
+      - JWT__ExpirationMinutes=1440
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      n8n:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # JavaScript 后端服务（备用）
+  backend-js:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    container_name: idataflow-backend
-    restart: unless-stopped
+    container_name: idataflow-backend-js
+    restart: "no"  # 默认不启动
+    profiles: ["js-backend"]  # 需要使用 --profile js-backend 启动
     environment:
       - NODE_ENV=development
-      - PORT=3000
+      - PORT=3100
       - N8N_HOST=http://n8n:5678
-      - N8N_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0OGQ2MGRiNi03MDM0LTQwN2EtOTRiOC1kY2VjZDFkNjE1MDkiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzYwMjQ2NDkxLCJleHAiOjE3NjI3OTA0MDB9.TwWYRAyOjEN9igEhiB5tmeUilnk6sMWVEYlk65b2TaY
+      - N8N_API_KEY=
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=idataflow
       - DB_USER=postgres
       - DB_PASSWORD=postgres_password
-      - WS_PORT=3001
+      - WS_PORT=3101
     ports:
-      - "3000:3000"
-      - "3001:3001"
+      - "3100:3100"
+      - "3101:3101"
     volumes:
       - ../backend:/app
       - /app/node_modules

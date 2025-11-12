@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 测试客户端</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket 测试客户端</h1>
+    
+    <div class="container">
+        <div id="status" class="status disconnected">断开连接</div>
+        
+        <div>
+            <input type="text" id="wsUrl" value="ws://localhost:3000/ws" placeholder="WebSocket URL">
+            <button onclick="connect()" class="btn-primary">连接</button>
+            <button onclick="disconnect()" class="btn-danger">断开</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>注册客户端</h3>
+        <input type="text" id="companyId" value="1" placeholder="Company ID">
+        <button onclick="register()" class="btn-success">注册</button>
+    </div>
+
+    <div class="container">
+        <h3>发送数据</h3>
+        <div>
+            <label>温度:</label>
+            <input type="number" id="temperature" value="25.5" step="0.1" placeholder="温度值">
+        </div>
+        <div>
+            <label>湿度:</label>
+            <input type="number" id="humidity" value="60" step="0.1" placeholder="湿度值">
+        </div>
+        <div>
+            <label>压力:</label>
+            <input type="number" id="pressure" value="1013.25" step="0.01" placeholder="压力值">
+        </div>
+        <button onclick="sendData()" class="btn-warning">发送数据</button>
+        <button onclick="sendHighTempAlert()" class="btn-danger">发送高温警报 (>35°C)</button>
+    </div>
+
+    <div class="container">
+        <h3>测试消息</h3>
+        <button onclick="sendPing()" class="btn-primary">发送 Ping</button>
+        <button onclick="sendTestMessage()" class="btn-primary">发送测试消息</button>
+    </div>
+
+    <div class="container">
+        <h3>日志</h3>
+        <button onclick="clearLog()" class="btn-danger">清除日志</button>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isRegistered = false;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = '已连接';
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = '断开连接';
+                isRegistered = false;
+            }
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            log(`正在连接到: ${url}`);
+            
+            ws = new WebSocket(url);
+            
+            ws.onopen = function(event) {
+                log('✅ WebSocket 连接已建立');
+                updateStatus(true);
+            };
+            
+            ws.onmessage = function(event) {
+                log(`📨 收到消息: ${event.data}`);
+            };
+            
+            ws.onclose = function(event) {
+                log(`❌ WebSocket 连接已关闭: ${event.code} - ${event.reason}`);
+                updateStatus(false);
+            };
+            
+            ws.onerror = function(error) {
+                log(`🚨 WebSocket 错误: ${error}`);
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                log('📴 主动断开连接');
+                updateStatus(false);
+            }
+        }
+
+        function register() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket 未连接');
+                return;
+            }
+            
+            const companyId = document.getElementById('companyId').value;
+            const message = {
+                type: 'register',
+                companyId: parseInt(companyId)
+            };
+            
+            ws.send(JSON.stringify(message));
+            log(`📝 发送注册消息: ${JSON.stringify(message)}`);
+            isRegistered = true;
+        }
+
+        function sendData() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket 未连接');
+                return;
+            }
+            
+            if (!isRegistered) {
+                log('⚠️ 请先注册客户端');
+                return;
+            }
+
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const humidity = parseFloat(document.getElementById('humidity').value);
+            const pressure = parseFloat(document.getElementById('pressure').value);
+            
+            const data = {
+                type: 'data',
+                payload: {
+                    temperature: temperature,
+                    humidity: humidity,
+                    pressure: pressure,
+                    timestamp: new Date().toISOString(),
+                    deviceId: 'test-device-001',
+                    location: 'test-location'
+                }
+            };
+            
+            ws.send(JSON.stringify(data));
+            log(`📤 发送数据: ${JSON.stringify(data)}`);
+        }
+
+        function sendHighTempAlert() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket 未连接');
+                return;
+            }
+            
+            if (!isRegistered) {
+                log('⚠️ 请先注册客户端');
+                return;
+            }
+
+            const data = {
+                type: 'data',
+                payload: {
+                    temperature: 36.5 + Math.random() * 5, // 36.5-41.5°C
+                    humidity: 65,
+                    pressure: 1015.2,
+                    timestamp: new Date().toISOString(),
+                    deviceId: 'test-device-001',
+                    location: 'test-location',
+                    alert: true,
+                    alertType: 'high_temperature'
+                }
+            };
+            
+            ws.send(JSON.stringify(data));
+            log(`🔥 发送高温警报: ${JSON.stringify(data)}`);
+        }
+
+        function sendPing() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket 未连接');
+                return;
+            }
+            
+            const message = { type: 'ping' };
+            ws.send(JSON.stringify(message));
+            log(`🏓 发送 Ping: ${JSON.stringify(message)}`);
+        }
+
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket 未连接');
+                return;
+            }
+            
+            const message = {
+                type: 'test',
+                message: 'Hello from WebSocket test client',
+                timestamp: new Date().toISOString()
+            };
+            
+            ws.send(JSON.stringify(message));
+            log(`🧪 发送测试消息: ${JSON.stringify(message)}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        // 页面加载时自动连接
+        window.onload = function() {
+            log('📄 页面已加载，准备测试 WebSocket 连接');
+        };
+    </script>
+</body>
+</html>

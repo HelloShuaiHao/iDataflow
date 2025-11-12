@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>iDataflow WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; }
+        .log { background: #f5f5f5; padding: 10px; height: 300px; overflow-y: auto; border: 1px solid #ccc; }
+        .controls { margin: 10px 0; }
+        button { margin: 5px; padding: 10px; }
+        input { padding: 5px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 iDataflow C# Backend WebSocket Test</h1>
+        
+        <div class="controls">
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+            <button onclick="register()">Register</button>
+            <button onclick="sendData()">Send Test Data</button>
+            <button onclick="ping()">Ping</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <div>
+            <strong>Company ID:</strong> <input type="text" id="companyId" value="test-company-001">
+        </div>
+        
+        <div class="log" id="log"></div>
+        
+        <div style="margin-top: 20px;">
+            <h3>Test Instructions:</h3>
+            <ol>
+                <li>Click <strong>Connect</strong> to connect to WebSocket server</li>
+                <li>Click <strong>Register</strong> to register with a company ID</li>
+                <li>Click <strong>Send Test Data</strong> to send sample data</li>
+                <li>Click <strong>Ping</strong> to test heartbeat</li>
+                <li>Check the log for server responses</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function connect() {
+            if (socket) {
+                log('❌ Already connected');
+                return;
+            }
+            
+            socket = new WebSocket('ws://localhost:3000/ws');
+            
+            socket.onopen = function(event) {
+                log('✅ Connected to WebSocket server');
+            };
+            
+            socket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`📨 Received: ${JSON.stringify(data, null, 2)}`);
+                } catch (e) {
+                    log(`📨 Received (raw): ${event.data}`);
+                }
+            };
+            
+            socket.onclose = function(event) {
+                log(`❌ Connection closed: ${event.code} - ${event.reason}`);
+                socket = null;
+            };
+            
+            socket.onerror = function(error) {
+                log(`💥 Error: ${error}`);
+            };
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+                log('🔌 Disconnected');
+            } else {
+                log('❌ Not connected');
+            }
+        }
+        
+        function register() {
+            if (!socket) {
+                log('❌ Not connected');
+                return;
+            }
+            
+            const companyId = document.getElementById('companyId').value;
+            const message = {
+                type: 'register',
+                companyId: companyId
+            };
+            
+            socket.send(JSON.stringify(message));
+            log(`📤 Sent register: ${JSON.stringify(message)}`);
+        }
+        
+        function sendData() {
+            if (!socket) {
+                log('❌ Not connected');
+                return;
+            }
+            
+            const message = {
+                type: 'data',
+                payload: {
+                    sensorId: 'sensor-001',
+                    value: Math.round(Math.random() * 100),
+                    temperature: Math.round(Math.random() * 50),
+                    timestamp: new Date().toISOString()
+                }
+            };
+            
+            socket.send(JSON.stringify(message));
+            log(`📤 Sent data: ${JSON.stringify(message)}`);
+        }
+        
+        function ping() {
+            if (!socket) {
+                log('❌ Not connected');
+                return;
+            }
+            
+            const message = { type: 'ping' };
+            socket.send(JSON.stringify(message));
+            log(`📤 Sent ping: ${JSON.stringify(message)}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Auto connect on page load
+        window.onload = function() {
+            log('🚀 iDataflow C# Backend WebSocket Test Client Ready');
+            log('Click Connect to start testing...');
+        }
+    </script>
+</body>
+</html>
