@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="../build/iDataflow.Backend.props" />
+</Project>

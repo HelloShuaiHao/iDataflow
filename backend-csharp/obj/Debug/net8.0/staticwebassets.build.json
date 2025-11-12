@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "Zvtn/5k7nOyFDFsof5dG4BZ1JuzzMUYJGDmyQWvKwpI=",
+  "Source": "iDataflow.Backend",
+  "BasePath": "_content/iDataflow.Backend",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
