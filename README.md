@@ -7,7 +7,12 @@ Dataflow
 cd docker
 docker-compose up -d
 
-n8n会监听5678端口，node-red端口可以在命令行看到，其中n8n首次部署会要求注册账号密码。
+n8n会监听5678端口，node-red端口可以在命令行看到
+
+n8n默认管理员账号：
+  - 邮箱：admin@idataflow.local
+  - 密码：ChangeMe123!
+  - 访问地址：http://localhost:5678
 
 确保node-red 和 n8n部署完成以后 分别向其中导入json文件夹的flow文件
 
