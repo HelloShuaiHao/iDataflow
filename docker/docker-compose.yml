@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: postgres_password
       POSTGRES_DB: idataflow
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
@@ -72,7 +72,7 @@ services:
       - JWT__Audience=iDataflow-users
       - JWT__ExpirationMinutes=1440
     ports:
-      - "3000:3000"
+      - "3002:3000"
     depends_on:
       postgres:
         condition: service_healthy

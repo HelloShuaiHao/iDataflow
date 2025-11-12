@@ -1,0 +1,162 @@
+[
+    {
+        "id": "11eb3bdfa5a3903c",
+        "type": "tab",
+        "label": "Flow 3",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "bc4b36a4e0873537",
+        "type": "http in",
+        "z": "11eb3bdfa5a3903c",
+        "name": "Create Channel",
+        "url": "/channel",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 340,
+        "y": 160,
+        "wires": [
+            [
+                "5ee0f5656aaa38cd"
+            ]
+        ]
+    },
+    {
+        "id": "5ee0f5656aaa38cd",
+        "type": "function",
+        "z": "11eb3bdfa5a3903c",
+        "name": "Gen channelId & URL",
+        "func": "function genId() { return (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)); }\nconst id = genId();\nlet ch = flow.get('channels') || {};\nch[id] = { createdAt: Date.now(), sessions: {} };\nflow.set('channels', ch);\n\nconst hdr = msg.req.headers || {};\nconst xf = (hdr['x-forwarded-proto'] || '').toLowerCase();\nconst host = hdr['x-forwarded-host'] || hdr['host'] || 'localhost:1880';\nconst isTLS = xf ? xf === 'https' : host.endsWith(':443');\nconst wsProto = isTLS ? 'wss' : 'ws';\nconst wsUrl = `${wsProto}://${host}/ws-relay?ch=${id}`;\n\nmsg.payload = { channelId: id, ws: wsUrl };\nmsg.statusCode = 200;\nmsg.headers = { 'Content-Type': 'application/json' };\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 160,
+        "wires": [
+            [
+                "0c5d1c80755d9120"
+            ]
+        ]
+    },
+    {
+        "id": "0c5d1c80755d9120",
+        "type": "http response",
+        "z": "11eb3bdfa5a3903c",
+        "name": "Return wss URL",
+        "statusCode": "",
+        "headers": {},
+        "x": 840,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "595cf54cc49b4805",
+        "type": "websocket in",
+        "z": "11eb3bdfa5a3903c",
+        "name": "WS Server /ws-relay",
+        "server": "dc6caa34f27fda90",
+        "client": "",
+        "x": 330,
+        "y": 260,
+        "wires": [
+            [
+                "05367daffe65c199"
+            ]
+        ]
+    },
+    {
+        "id": "05367daffe65c199",
+        "type": "function",
+        "z": "11eb3bdfa5a3903c",
+        "name": "Register Session ↔ Channel",
+        "func": "function pickJoinMessage(msg){ let p=msg.payload; if(typeof p==='string'){ try{ p=JSON.parse(p);}catch(e){} } if(!p||typeof p!=='object'||!p.type||!p.channelId){ p={type:msg.type, channelId:msg.channelId}; } return p; }\nlet p = pickJoinMessage(msg);\nif(!p||p.type!=='join'||!p.channelId||!msg._session||!msg._session.id){ return null; }\nconst cid=p.channelId; const sid=msg._session.id;\nlet ch=flow.get('channels')||{}; if(!ch[cid]) ch[cid]={createdAt:Date.now(),sessions:{}};\nif(ch[cid].sessions[sid]){ return null; }\nch[cid].sessions[sid]=Date.now(); flow.set('channels',ch);\nreturn {_session:msg._session, payload:{ok:true, channelId:cid}};",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 260,
+        "wires": [
+            [
+                "b9f890be408f74fd"
+            ]
+        ]
+    },
+    {
+        "id": "b9f890be408f74fd",
+        "type": "websocket out",
+        "z": "11eb3bdfa5a3903c",
+        "name": "WS Send (Join Ack)",
+        "server": "dc6caa34f27fda90",
+        "client": "",
+        "x": 880,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "26fae7ceb3823c52",
+        "type": "http in",
+        "z": "11eb3bdfa5a3903c",
+        "name": "Relay IN",
+        "url": "/relay",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 320,
+        "y": 360,
+        "wires": [
+            [
+                "b15d49515cb9303d"
+            ]
+        ]
+    },
+    {
+        "id": "b15d49515cb9303d",
+        "type": "function",
+        "z": "11eb3bdfa5a3903c",
+        "name": "Fan-out to channel sessions",
+        "func": "// 修改 \"Fan-out to channel sessions\" 函数的 func 属性：\nconst body = (typeof msg.payload === 'string') ? (function () { try { return JSON.parse(msg.payload); } catch (e) { return {}; } })() : (msg.payload || {});\nconst cid = body.channelId;\n\n// DEBUG: 记录每次请求\nnode.warn(`[${new Date().toISOString()}] Relay request received, msgId: ${msg._msgid}`);\n\nif (!cid) {\n    msg.statusCode = 400;\n    msg.payload = { error: 'missing channelId' };\n    return [null, msg];\n}\nlet ch = flow.get('channels') || {};\nconst entry = ch[cid];\nif (!entry || !entry.sessions) {\n    msg.statusCode = 200;\n    msg.payload = { delivered: 0, ok: true };\n    return [null, msg];\n}\n\n// 使用 msgid + channelId 去重（更精确）\nconst dedupeKey = `${msg._msgid}:${cid}`;\nlet sentMsgs = flow.get('sentMsgs') || {};\n\n// 清理 5 分钟前的旧记录\nconst now = Date.now();\nObject.keys(sentMsgs).forEach(id => {\n    if (now - sentMsgs[id] > 300000) {\n        delete sentMsgs[id];\n    }\n});\n\n// 如果这个 msgid 已经发送过，直接返回\nif (sentMsgs[dedupeKey]) {\n    node.warn(`[${new Date().toISOString()}] SKIPPED duplicate msgId: ${msg._msgid}`);\n    msg.statusCode = 200;\n    msg.payload = { delivered: 0, ok: true, skipped: 'duplicate msgid' };\n    return [null, msg];\n}\n\n// 标记这个 msgid 已发送\nsentMsgs[dedupeKey] = now;\nflow.set('sentMsgs', sentMsgs);\n\nconst sessionIds = Object.keys(entry.sessions);\n\nnode.warn(`[${new Date().toISOString()}] Sending to ${sessionIds.length} sessions`);\nnode.warn('sessionIds: ' + JSON.stringify(sessionIds));\nsessionIds.forEach(id => {\n    node.warn('send to session: ' + id);\n    node.send([\n        { _session: { id }, payload: body.data },\n        null\n    ]);\n});\n\nmsg.statusCode = 200;\nmsg.payload = { delivered: sessionIds.length, ok: true };\nreturn [null, msg];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 360,
+        "wires": [
+            [
+                "b9f890be408f74fd"
+            ],
+            [
+                "305ca1242f18fecd"
+            ]
+        ]
+    },
+    {
+        "id": "305ca1242f18fecd",
+        "type": "http response",
+        "z": "11eb3bdfa5a3903c",
+        "name": "ACK",
+        "statusCode": "",
+        "headers": {},
+        "x": 860,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "dc6caa34f27fda90",
+        "type": "websocket-listener",
+        "path": "/ws-relay",
+        "wholemsg": "true"
+    }
+]

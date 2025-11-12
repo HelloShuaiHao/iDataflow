@@ -1,0 +1,271 @@
+{
+  "name": "Auto WSS to Node-RED Relay",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wss-relay",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        128
+      ],
+      "name": "WSS Data Input",
+      "id": "5c66759c-bb3d-44b8-abd5-b20da8ba4e86",
+      "webhookId": "60da8de9-636f-422b-8cf3-826bc2523578"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst incoming = items[0].json;\n\nif (staticData.channelId && staticData.wsUrl) {\n  return [{\n    json: {\n      hasChannel: true,\n      channelId: staticData.channelId,\n      wsUrl: staticData.wsUrl,\n      original: incoming\n    }\n  }];\n}\nstaticData._pendingOriginal = incoming;\nreturn [{ json: { hasChannel: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        128
+      ],
+      "name": "Check Channel Status",
+      "id": "30c814ab-fa21-4557-bacc-b530feb3c780"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasChannel }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        128
+      ],
+      "name": "Has Channel?",
+      "id": "24fbff9e-a35d-49f0-a547-0f4bf30bccfc"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.5.58.174:1880/channel",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        0,
+        0
+      ],
+      "name": "Create New Channel",
+      "id": "c1cbfebe-68f6-4d27-b754-67dca53ed64d"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst resp = items[0].json;\nconst channelId = resp.channelId;\nconst wsUrl = resp.ws;\nif (!channelId || !wsUrl) {\n  return [{\n    json: { error: 'Channel creation response missing channelId or ws' }\n  }];\n}\nstaticData.channelId = channelId;\nstaticData.wsUrl = wsUrl;\nconst original = staticData._pendingOriginal;\ndelete staticData._pendingOriginal;\nreturn [{\n  json: {\n    channelId,\n    wsUrl,\n    original,\n    isNewChannel: true\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "name": "Store New Channel",
+      "id": "af646d67-a67c-4794-9188-cc352b10c000"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = items[0].json;\nconst channelId = data.channelId;\nif (!channelId) {\n  return [{\n    json: { error: 'channelId missing before relay' }\n  }];\n}\nconst payload = data.original || data.data || data.payload || {};\nconst relay = {\n  channelId,\n  data: {\n    timestamp: new Date().toISOString(),\n    source: 'n8n_wss_auto',\n    messageId: Math.random().toString(36).slice(2, 11),\n    isNewChannel: !!data.isNewChannel,\n    payload\n  }\n};\nreturn [{\n  json: relay\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        224,
+        224
+      ],
+      "name": "Prepare Relay Data",
+      "id": "385e1e50-b530-4dea-b5e7-9bfc22e8f1fe"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.5.58.174:1880/relay",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channelId\": \"{{ $json.channelId }}\",\n  \"data\": {{ JSON.stringify($json.data ? $json.data : $json.original ? $json.original : $json) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        448,
+        224
+      ],
+      "name": "Relay to Node-RED",
+      "id": "4b8ff29f-1382-4d6d-9491-08f7b430b7f9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nreturn [{\n  json: {\n    status: 'success',\n    channelId: staticData.channelId,\n    relayed: true,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        672,
+        224
+      ],
+      "name": "Prepare Response",
+      "id": "cd51e057-33be-4067-b5ec-7fc6c05d1e2f"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        880,
+        224
+      ],
+      "name": "Success Response",
+      "id": "cce9a4e9-8ce6-4a74-9701-0213b6e348b4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WSS Data Input": {
+      "main": [
+        [
+          {
+            "node": "Check Channel Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Channel Status": {
+      "main": [
+        [
+          {
+            "node": "Has Channel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Channel?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Relay Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create New Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Channel": {
+      "main": [
+        [
+          {
+            "node": "Store New Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store New Channel": {
+      "main": [
+        [
+          {
+            "node": "Prepare Relay Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Relay Data": {
+      "main": [
+        [
+          {
+            "node": "Relay to Node-RED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relay to Node-RED": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "78d04571-fded-48f8-9dc0-64c02746ee30",
+  "meta": {
+    "instanceId": "0fa3ea536d938e4948889ada9ed48cd7713ed92fde65dab59550761a3c7cabbc"
+  },
+  "id": "5sXA204ussL80LzJ",
+  "tags": []
+}

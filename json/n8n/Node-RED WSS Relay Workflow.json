@@ -1,0 +1,133 @@
+{
+  "name": "Node-RED WSS Relay Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "1158ae5b-867d-40ec-868c-5b3ffbdd7b7d",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        -32
+      ],
+      "id": "6a28ce51-928e-440f-abe7-bc1d4b522367",
+      "name": "Webhook",
+      "webhookId": "1158ae5b-867d-40ec-868c-5b3ffbdd7b7d",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "083e4614-6e23-49ee-b246-533b9e42b3e8",
+              "name": "processedAt",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "070b53ee-69a3-45d7-81c0-9c68d34b63d8",
+              "name": "body.temperature",
+              "value": "={{ $json.body.temperature }}",
+              "type": "number"
+            },
+            {
+              "id": "b71691a6-1826-4620-a3a6-6c0080c37f30",
+              "name": "webhookUrl",
+              "value": "={{ $json.webhookUrl }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        -32
+      ],
+      "id": "33af1afd-73bf-428d-8b63-df156c00b0ea",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://jsonplaceholder.typicode.com/users/1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        176,
+        160
+      ],
+      "id": "c360d9bd-1068-4b05-9a07-c83569155c86",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        432,
+        96
+      ],
+      "id": "f4af3666-457b-46bf-942e-0856591e1687",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d45a9dfc-a130-43b3-ba9e-7c6f8832d1f0",
+  "meta": {
+    "instanceId": "0fa3ea536d938e4948889ada9ed48cd7713ed92fde65dab59550761a3c7cabbc"
+  },
+  "id": "cuuWDFWOoZtuS6XD",
+  "tags": []
+}
